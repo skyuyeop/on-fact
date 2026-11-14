@@ -350,7 +350,7 @@ function selectRegion(r) {
 function updateLeafletMap(mapInstance, containerId, items) {
   if (!mapInstance) {
     mapInstance = L.map(containerId).setView([36.8, 127.3], 7);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapInstance);
   }
   mapInstance.invalidateSize();
   mapInstance.eachLayer(layer => { if (layer instanceof L.Marker) mapInstance.removeLayer(layer); });
