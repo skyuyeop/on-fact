@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>경찰청 위기관리 팩트체크 | ON-FACT</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; }
+  body { margin: 0; padding: 0; background-color: #F4F6F9; color: #0F172A; display: flex; justify-content: center; }
+  .app-container { width: 100%; max-width: 680px; padding: 16px 16px 60px 16px; }
+
+  /* 경찰청 공식 헤더 (#0054a6 + #ffcb05) */
+  .knpa-header {
+    background: linear-gradient(135deg, #003876 0%, #0054a6 100%);
+    border-bottom: 4px solid #ffcb05; border-radius: 14px; padding: 20px 22px;
+    color: #FFF; box-shadow: 0 6px 18px rgba(0, 84, 166, 0.18); margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .knpa-badge {
+    display: inline-block; background: rgba(255, 203, 5, 0.18); border: 1px solid #ffcb05;
+    color: #ffcb05; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;
+  }
+  .knpa-title { font-size: 21px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+  .knpa-sub { font-size: 12.5px; color: #D8E6F5; margin: 4px 0 0 0; }
+
+  /* 5개 네비게이션 탭 */
+  .tab-bar {
+    display: flex; gap: 4px; background: #E6ECF5; padding: 5px; border-radius: 10px;
+    margin-bottom: 16px; overflow-x: auto;
+  }
+  .tab-btn {
+    flex: 1; border: none; background: transparent; padding: 10px 6px; border-radius: 8px;
+    font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; white-space: nowrap; transition: 0.15s;
+  }
+  .tab-btn.active { background: #0054a6; color: #FFF; box-shadow: 0 2px 6px rgba(0, 84, 166, 0.25); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* 검색창 */
+  .search-box {
+    width: 100%; padding: 13px 16px; border-radius: 10px; border: 1.5px solid #CBD5E1;
+    font-size: 14px; background: #FFF; outline: none; margin-bottom: 14px;
+  }
+  .search-box:focus { border-color: #0054a6; box-shadow: 0 0 0 3px rgba(0, 84, 166, 0.1); }
+
+  .section-label {
+    font-size: 14px; font-weight: 800; color: #003876; margin: 12px 0 10px 0;
+    padding-left: 8px; border-left: 3.5px solid #ffcb05;
+  }
+
+  /* 일체형 통합 사건 카드 */
+  .fact-card {
+    background: #FFF; border-radius: 12px; border: 1px solid #E2E8F0;
+    border-left: 5px solid #0054a6; margin-bottom: 12px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+  .fact-card.red { border-left-color: #ed1b2f; }
+  .fact-card.orange { border-left-color: #ffcb05; }
+  .fact-card.blue { border-left-color: #0054a6; }
+
+  .card-body { padding: 16px 18px 12px 18px; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 800; padding: 3px 9px; border-radius: 5px; margin-bottom: 6px; }
+  .pill-red { background: #FDE8EA; color: #ed1b2f; }
+  .pill-orange { background: #FFF8DB; color: #a4681d; border: 1px solid #ffcb05; }
+  .pill-blue { background: #E6F0FA; color: #0054a6; }
+  .pill-new { background: #0054a6; color: #ffcb05; margin-left: 5px; }
+
+  .card-title { font-size: 16px; font-weight: 700; color: #0F172A; margin: 2px 0 6px 0; line-height: 1.4; }
+  .card-meta { font-size: 12px; color: #64748B; }
+
+  /* 카드 내 아코디언 상세 영역 */
+  details.card-details { background: #F8FAFC; border-top: 1px dashed #CBD5E1; }
+  details.card-details summary {
+    padding: 10px 18px; font-size: 13px; font-weight: 700; color: #0054a6; cursor: pointer; list-style: none;
+  }
+  details.card-details summary::-webkit-details-marker { display: none; }
+  details.card-details summary::before { content: "▸ "; }
+  details.card-details[open] summary::before { content: "▾ "; }
+  .details-inner { padding: 4px 18px 16px 18px; font-size: 13.5px; line-height: 1.6; color: #1E293B; }
+
+  .share-box {
+    background: #EFF4FA; border: 1px solid #CBD5E1; border-radius: 8px; padding: 10px 12px;
+    font-size: 12px; white-space: pre-wrap; margin-top: 8px; color: #0F172A;
+  }
+  .btn-copy {
+    margin-top: 8px; background: #0054a6; color: #FFF; border: none; padding: 8px 14px;
+    border-radius: 6px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .btn-copy:active { opacity: 0.85; }
+
+  /* 권역 필터 칩 */
+  .region-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip {
+    padding: 6px 12px; border-radius: 20px; border: 1px solid #CBD5E1; background: #FFF;
+    font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer;
+  }
+  .chip.active { background: #0054a6; color: #FFF; border-color: #0054a6; }
+
+  /* 지도 영역 */
+  .map-box { width: 100%; height: 320px; border-radius: 12px; border: 1px solid #CBD5E1; margin-bottom: 14px; z-index: 1; }
+
+  /* 입력 폼 */
+  .form-card { background: #FFF; padding: 18px; border-radius: 12px; border: 1px solid #E2E8F0; }
+  .form-group { margin-bottom: 12px; }
+  .form-label { display: block; font-size: 13px; font-weight: 700; color: #1E293B; margin-bottom: 5px; }
+  .form-input, .form-select, .form-textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #CBD5E1; font-size: 13.5px;
+  }
+  .btn-submit {
+    width: 100%; background: #0054a6; color: #FFF; border: none; padding: 12px;
+    border-radius: 8px; font-size: 14.5px; font-weight: 800; cursor: pointer; margin-top: 4px;
+  }
+  .btn-reset {
+    width: 100%; background: #FFF; color: #ed1b2f; border: 1px solid #ed1b2f; padding: 10px;
+    border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 16px;
+  }
+  .guide-box { background: #FFF; border: 1px solid #DCE5F2; border-radius: 12px; padding: 14px 16px; margin-top: 16px; }
+  .empty-msg { background: #FFF; border: 1px dashed #CBD5E1; border-radius: 10px; padding: 20px; text-align: center; color: #64748B; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app-container">
+  <!-- 상단 경찰청 공식 헤더 -->
+  <div class="knpa-header">
+    <div>
+      <span class="knpa-badge">대한민국 경찰청 위기관리 커뮤니케이션</span>
+      <h1 class="knpa-title">폴리스 팩트체크 (ON-FACT)</h1>
+      <p class="knpa-sub">치안·재난 허위정보 실시간 공식 검증 및 현장 대응 안내</p>
+    </div>
+    <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
+      <path d="M32 4L8 14V30C8 45.5 18.2 58.6 32 62C45.8 58.6 56 45.5 56 30V14L32 4Z" fill="#002654" stroke="#ffcb05" stroke-width="3"/>
+      <path d="M16 24L32 18L48 24L42 32H22L16 24Z" fill="#ffcb05"/>
+      <circle cx="32" cy="40" r="9" fill="#ed1b2f"/>
+      <path d="M23 40C23 44.97 27.03 49 32 49C36.97 49 41 44.97 41 40H23Z" fill="#0054a6"/>
+      <circle cx="32" cy="40" r="9" stroke="#ffcb05" stroke-width="2"/>
+    </svg>
+  </div>
+
+  <!-- 5개 메인 탭 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('tab1', this)">주요 브리핑</button>
+    <button class="tab-btn" id="btn-tab2" onclick="switchTab('tab2', this)">실시간 업데이트 (0)</button>
+    <button class="tab-btn" onclick="switchTab('tab3', this)">지역별 조회</button>
+    <button class="tab-btn" onclick="switchTab('tab4', this)">치안 팩트 맵</button>
+    <button class="tab-btn" onclick="switchTab('tab5', this)">상황실 등록</button>
+  </div>
+
+  <!-- [탭 1] 주요 브리핑 + 통합 검색 -->
+  <div id="tab1" class="tab-content active">
+    <input type="text" id="mainSearch" class="search-box" placeholder="소문 키워드·역명·문자를 입력하세요 (전체 브리핑 통합 검색)" oninput="renderAll()">
+    <div id="tab1-content"></div>
+    <div class="guide-box">
+      <div style="font-size:13.5px; font-weight:700; color:#003876;">허위 치안 정보 유포는 명백한 범죄입니다</div>
+      <div style="font-size:12px; color:#475569; margin-top:3px;">살인예고·허위 재난 루머 유포 시 위계에 의한 공무집행방해죄로 엄정 처벌됩니다. 긴급 신고는 112를 이용해 주세요.</div>
+    </div>
+  </div>
+
+  <!-- [탭 2] 실시간 업데이트 전용 -->
+  <div id="tab2" class="tab-content">
+    <div class="section-label">실시간 업데이트된 팩트체크 브리핑</div>
+    <div id="tab2-content"></div>
+  </div>
+
+  <!-- [탭 3] 지역별 조회 전용 -->
+  <div id="tab3" class="tab-content">
+    <div class="section-label">권역·지역별 팩트체크 현황 조회</div>
+    <div class="region-chips" id="regionChips"></div>
+    <input type="text" id="regionSearch" class="search-box" placeholder="지역 내 상세 지명·역명 필터 (예: 강남역, 송도, 서울대입구)" oninput="renderRegionTab()">
+    <div id="regionMap" class="map-box"></div>
+    <div id="tab3-content"></div>
+  </div>
+
+  <!-- [탭 4] 전국 치안 팩트 맵 -->
+  <div id="tab4" class="tab-content">
+    <div class="section-label">전국 관할 경찰서 현장 확인 완료 지점</div>
+    <div id="globalMap" class="map-box"></div>
+    <div id="tab4-list"></div>
+  </div>
+
+  <!-- [탭 5] 경찰 상황실 공식 등록 -->
+  <div id="tab5" class="tab-content">
+    <div class="section-label">경찰청·시도청 상황실 공식 팩트 게시</div>
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">사안 제목 (필수)</label>
+        <input type="text" id="inTitle" class="form-input" placeholder="예: 서울대입구역 인근 흉기난동 예고글 유포 건">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">공식 판정 결과</label>
+          <select id="inStatus" class="form-select">
+            <option value="허위 사실 (루머)">허위 사실 (루머)</option>
+            <option value="사실 확인 (경보 발령)">사실 확인 (경보 발령)</option>
+            <option value="일부 사실 (조치 완료)">일부 사실 (조치 완료)</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">관할 권역</label>
+          <select id="inRegion" class="form-select">
+            <option value="자동 판별">자동 판별</option>
+            <option value="서울">서울</option>
+            <option value="인천·경기">인천·경기</option>
+            <option value="대전·충청">대전·충청</option>
+            <option value="대구·경북">대구·경북</option>
+            <option value="부산·울산·경남">부산·울산·경남</option>
+            <option value="광주·전라">광주·전라</option>
+            <option value="전국 공통">전국 공통</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">발생 장소 또는 역명 (지도 자동 매핑)</label>
+        <input type="text" id="inLocation" class="form-input" placeholder="예: 서울대입구, 홍대입구, 부평역, 해운대">
+      </div>
+      <div class="form-group">
+        <label class="form-label">검색 키워드 (쉼표로 구분)</label>
+        <input type="text" id="inKeywords" class="form-input" placeholder="서울대입구, 관악구, 흉기">
+      </div>
+      <div class="form-group">
+        <label class="form-label">경찰 확인 사실 (필수)</label>
+        <textarea id="inSummary" class="form-textarea" rows="3" placeholder="관할 경찰서 형사기동대 및 순찰차 현장 확인 결과 특이사항 없습니다."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">현장 조치 및 국민 행동 요령</label>
+        <textarea id="inAction" class="form-textarea" rows="2" placeholder="정상 이용 가능하며 허위글 최초 유포자 추적 수사 중입니다."></textarea>
+      </div>
+      <button class="btn-submit" onclick="addNewFact()">공식 브리핑 즉시 게시</button>
+    </div>
+    <button class="btn-reset" onclick="resetData()">시연용 추가 데이터 초기화</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "knpa_onfact_db_v1";
+
+const DEFAULT_DATA = [
+  { id: 1, is_new: false, region: "서울", keywords: ["강남역", "흉기", "칼부림", "테러", "예고"], title: "오늘 밤 강남역 일대 흉기난동 예고글 유포 건", status: "허위 사실 (루머)", badge_color: "red", summary: "SNS에 유포 중인 강남역 테러 예고 캡처본은 과거 게시물을 조작한 허위 사실로 확인되었습니다.", action: "관할 경찰서 기동순찰대 집중 배치 완료 및 최초 유포자 IP 추적 수사 착수.", location: "서울 강남구 강남역 일대", lat: 37.4979, lon: 127.0276, updated_at: "2026-11-14 14:20" },
+  { id: 2, is_new: false, region: "전국 공통", keywords: ["부고장", "청첩장", "스미싱", "링크", "결제"], title: "지인 사칭 모바일 부고장 문자 클릭 시 소액결제 피해 주의", status: "사실 확인 (경보 발령)", badge_color: "orange", summary: "지인 번호를 도용해 악성 앱(.apk) 설치를 유도하는 신종 스미싱 문자가 전국적으로 유포 중입니다.", action: "출처 불명 URL 클릭 금지. 클릭 시 즉시 비행기 모드 전환 후 112 신고 및 '시티즌코난'으로 악성앱 삭제.", location: "전국 공통 (사이버수사국)", lat: 37.5665, lon: 126.9780, updated_at: "2026-11-14 11:05" },
+  { id: 3, is_new: false, region: "인천·경기", keywords: ["송도", "싱크홀", "도로", "붕괴", "통제"], title: "인천 송도 국제업무지구역 인근 도로 침하 발생 건", status: "일부 사실 (조치 완료)", badge_color: "blue", summary: "상수도관 누수로 인한 소규모 아스팔트 침하가 발생했으나 인명 피해는 전혀 없습니다.", action: "관할 지구대 교통 통제 하에 긴급 복구 작업이 완료되어 현재 정상 통행 가능합니다.", location: "인천 연수구 송도동", lat: 37.3915, lon: 126.6432, updated_at: "2026-11-14 16:40" }
+];
+
+const LANDMARKS = {
+  "서울대입구": [37.4812, 126.9527, "서울"], "강남역": [37.4979, 127.0276, "서울"], "홍대입구": [37.5572, 126.9247, "서울"],
+  "신림역": [37.4842, 126.9297, "서울"], "잠실역": [37.5133, 127.1001, "서울"], "서울역": [37.5547, 126.9707, "서울"],
+  "용산역": [37.5298, 126.9648, "서울"], "여의도": [37.5219, 126.9245, "서울"], "명동": [37.5636, 126.9827, "서울"],
+  "이태원": [37.5345, 126.9946, "서울"], "건대입구": [37.5404, 127.0692, "서울"], "서현역": [37.3850, 127.1235, "인천·경기"],
+  "부평역": [37.4895, 126.7245, "인천·경기"], "구월동": [37.4485, 126.7015, "인천·경기"], "송도": [37.3915, 126.6432, "인천·경기"],
+  "수원역": [37.2659, 127.0001, "인천·경기"], "대전역": [36.3325, 127.4342, "대전·충청"], "경찰대학": [36.7745, 127.0156, "대전·충청"],
+  "동대구역": [35.8797, 128.6285, "대구·경북"], "부산역": [35.1152, 129.0422, "부산·울산·경남"],
+  "해운대": [35.1587, 129.1604, "부산·울산·경남"], "서면": [35.1578, 129.0600, "부산·울산·경남"], "광주송정역": [35.1375, 126.7910, "광주·전라"]
+};
+
+let factDB = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [...DEFAULT_DATA];
+let selectedRegion = "전체";
+let globalMap = null, regionMap = null;
+
+function saveDB() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(factDB));
+}
+
+function createCardHTML(item) {
+  const newBadge = item.is_new ? '<span class="pill pill-new">NEW</span>' : '';
+  const shareText = `[경찰청 공식 팩트체크]\n■ 사안: ${item.title}\n■ 판정: ${item.status}\n■ 내용: ${item.summary}\n■ 조치: ${item.action}`;
+  return `
+    <div class="fact-card ${item.badge_color}">
+      <div class="card-body">
+        <div><span class="pill pill-${item.badge_color}">${item.status}</span>${newBadge}</div>
+        <div class="card-title">${item.title}</div>
+        <div class="card-meta">권역 · ${item.region}  |  관할 · ${item.location}  |  확인 · ${item.updated_at}</div>
+      </div>
+      <details class="card-details">
+        <summary>공식 확인 사실 및 단톡방 정정 카드 보기</summary>
+        <div class="details-inner">
+          <div><strong>[경찰 확인 사실]</strong><br>${item.summary}</div>
+          <div style="margin-top:8px;"><strong>[현장 조치 및 행동 요령]</strong><br>${item.action}</div>
+          <div class="share-box" id="share-${item.id}">${shareText}</div>
+          <button class="btn-copy" onclick="copyShare(${item.id})">단톡방 정정 카드 텍스트 복사</button>
+        </div>
+      </details>
+    </div>
+  `;
+}
+
+function copyShare(id) {
+  const txt = document.getElementById("share-" + id).innerText;
+  navigator.clipboard.writeText(txt).then(() => alert("공식 팩트체크 카드가 복사되었습니다. 단톡방에 붙여넣으세요."));
+}
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+  document.getElementById(tabId).classList.add("active");
+  btn.classList.add("active");
+  if (tabId === "tab3") setTimeout(renderRegionTab, 50);
+  if (tabId === "tab4") setTimeout(renderGlobalMap, 50);
+}
+
+function renderAll() {
+  const newItems = factDB.filter(i => i.is_new);
+  document.getElementById("btn-tab2").innerText = `실시간 업데이트 (${newItems.length})`;
+
+  // 탭 1
+  const q = document.getElementById("mainSearch").value.trim();
+  const tab1El = document.getElementById("tab1-content");
+  if (q) {
+    const matched = factDB.filter(i => i.keywords.some(k => q.includes(k)) || i.title.includes(q) || i.summary.includes(q) || i.location.includes(q));
+    tab1El.innerHTML = `<div class="section-label">통합 검색 결과 (${matched.length}건 확인됨)</div>` +
+      (matched.length ? matched.map(createCardHTML).join("") : `<div class="empty-msg">현재 경찰청 공식 DB에 등록되지 않은 새로운 루머입니다.<br><br><button class="btn-copy" onclick="alert('경찰청 상황실로 긴급 팩트체크 검증 요청이 접수되었습니다.')">긴급 팩트체크 검증 요청하기</button></div>`);
+  } else {
+    const baseItems = factDB.filter(i => !i.is_new);
+    tab1El.innerHTML = `<div class="section-label">경찰청 주요 위기관리 팩트체크 브리핑</div>` + baseItems.map(createCardHTML).join("");
+  }
+
+  // 탭 2
+  const tab2El = document.getElementById("tab2-content");
+  tab2El.innerHTML = newItems.length ? newItems.map(createCardHTML).join("") : `<div class="empty-msg">현재 추가 업데이트된 신규 팩트체크 내역이 없습니다. '상황실 등록' 탭에서 새 브리핑을 게시해 보세요.</div>`;
+
+  // 권역 칩 생성
+  const regions = ["전체", "서울", "인천·경기", "대전·충청", "대구·경북", "부산·울산·경남", "광주·전라", "전국 공통"];
+  document.getElementById("regionChips").innerHTML = regions.map(r => `<button class="chip ${selectedRegion === r ? 'active' : ''}" onclick="selectRegion('${r}')">${r}</button>`).join("");
+}
+
+function selectRegion(r) {
+  selectedRegion = r;
+  renderAll();
+  renderRegionTab();
+}
+
+function updateLeafletMap(mapInstance, containerId, items) {
+  if (!mapInstance) {
+    mapInstance = L.map(containerId).setView([36.8, 127.3], 7);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
+  }
+  mapInstance.invalidateSize();
+  mapInstance.eachLayer(layer => { if (layer instanceof L.Marker) mapInstance.removeLayer(layer); });
+  const bounds = [];
+  items.forEach(i => {
+    L.marker([i.lat, i.lon]).addTo(mapInstance).bindPopup(`<b>[${i.status}]</b><br>${i.title}<br><small>${i.location}</small>`);
+    bounds.push([i.lat, i.lon]);
+  });
+  if (bounds.length === 1) mapInstance.setView(bounds[0], 13);
+  else if (bounds.length > 1) mapInstance.fitBounds(bounds, { padding: [30, 30] });
+  return mapInstance;
+}
+
+function renderRegionTab() {
+  const subQ = document.getElementById("regionSearch").value.trim();
+  const filtered = factDB.filter(i => {
+    const regOk = selectedRegion === "전체" || i.region === selectedRegion;
+    const kwOk = !subQ || i.location.includes(subQ) || i.title.includes(subQ);
+    return regOk && kwOk;
+  });
+  regionMap = updateLeafletMap(regionMap, "regionMap", filtered);
+  document.getElementById("tab3-content").innerHTML = filtered.length ? filtered.map(createCardHTML).join("") : `<div class="empty-msg">'${selectedRegion}' 조건에 해당하는 브리핑이 없습니다.</div>`;
+}
+
+function renderGlobalMap() {
+  globalMap = updateLeafletMap(globalMap, "globalMap", factDB);
+  document.getElementById("tab4-list").innerHTML = factDB.map(i => `<div style="background:#FFF; padding:10px 14px; border-radius:8px; margin-bottom:6px; font-size:13px; border:1px solid #E2E8F0;"><strong>${i.location}</strong> · ${i.title} <span style="color:#0054a6; font-weight:700;">[${i.status}]</span></div>`).join("");
+}
+
+function addNewFact() {
+  const title = document.getElementById("inTitle").value.trim();
+  const summary = document.getElementById("inSummary").value.trim();
+  if (!title || !summary) return alert("사안 제목과 경찰 확인 사실은 필수 입력 항목입니다.");
+
+  const status = document.getElementById("inStatus").value;
+  const regSel = document.getElementById("inRegion").value;
+  const locText = document.getElementById("inLocation").value.trim() || "전국 공통";
+  const kwRaw = document.getElementById("inKeywords").value.trim();
+  const action = document.getElementById("inAction").value.trim() || "관할 경찰서에서 안전 조치 완료하였습니다.";
+
+  let lat = 37.5665, lon = 126.9780, autoReg = "전국 공통";
+  for (const [key, coords] of Object.entries(LANDMARKS)) {
+    if (locText.includes(key)) { [lat, lon, autoReg] = coords; break; }
+  }
+  const finalReg = regSel === "자동 판별" ? autoReg : regSel;
+  const colorMap = { "허위 사실 (루머)": "red", "사실 확인 (경보 발령)": "orange", "일부 사실 (조치 완료)": "blue" };
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  factDB.unshift({
+    id: Date.now(), is_new: true, region: finalReg,
+    keywords: kwRaw ? kwRaw.split(",").map(s => s.trim()) : title.split(" "),
+    title, status, badge_color: colorMap[status], summary, action, location: locText, lat, lon, updated_at: timeStr
+  });
+  saveDB();
+
+  document.getElementById("inTitle").value = "";
+  document.getElementById("inLocation").value = "";
+  document.getElementById("inKeywords").value = "";
+  document.getElementById("inSummary").value = "";
+  document.getElementById("inAction").value = "";
+
+  renderAll();
+  alert(`공식 브리핑이 즉시 게시되었습니다! (${finalReg} · ${locText})`);
+}
+
+function resetData() {
+  factDB = [...DEFAULT_DATA];
+  saveDB();
+  renderAll();
+  alert("초기 기본 데이터로 복원되었습니다.");
+}
+
+renderAll();
+</script>
+</body>
+</html>
