@@ -258,7 +258,6 @@
 
   <!-- TAB 5: 상황실 관리 (인증 + 제보함 + 등록/수정 + 기존 목록 관리) -->
   <div id="tab5" class="tab-content">
-    <!-- 인증 잠금 화면 -->
     <div id="adminLockScreen" class="auth-box">
       <div style="font-size:28px; margin-bottom:8px;">🔒</div>
       <div style="font-size:16px; font-weight:800; color:#003876; margin-bottom:4px;">경찰청·시도청 상황실 전용 구역</div>
@@ -269,7 +268,6 @@
       </div>
     </div>
 
-    <!-- 인증 완료 후 관리자 패널 -->
     <div id="adminPanel" style="display:none;">
       <div class="section-label" style="margin-top:0;">
         <span>시민 긴급 검증 요청 대기함 (<span id="reportCount">0</span>건)</span>
@@ -335,11 +333,8 @@
 </div>
 
 <script>
-// ★ 아래 따옴표 안에 Firebase Realtime Database URL을 붙여넣으세요
 const FIREBASE_URL = "https://on-fact-default-rtdb.firebaseio.com";
-// ★ 상황실 관리자 접속 PIN 번호 (필요 시 원하는 숫자로 변경하세요)
 const ADMIN_PIN = "1120";
-
 const BASE_DB_URL = FIREBASE_URL.replace(/\/$/, "");
 
 const DEFAULT_DATA = [
@@ -369,12 +364,14 @@ let editingFactId = null;
 let convertingReportId = null;
 
 function escapeHTML(str) {
-  return String(str || "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """)
-    .replace(/'/g, "'");
+  const map = {
+    "&": "\u0026amp;",
+    "<": "\u0026lt;",
+    ">": "\u0026gt;",
+    '"': "\u0026quot;",
+    "'": "\u0026#39;"
+  };
+  return String(str || "").replace(/[&<>"']/g, m => map[m]);
 }
 
 function getFormattedNow() {
@@ -382,7 +379,6 @@ function getFormattedNow() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
-// 클라우드 DB에서 데이터 불러오기 (변경 감지 시에만 화면 갱신)
 async function loadFromCloud() {
   if (!BASE_DB_URL.startsWith("http")) {
     document.getElementById("syncBadge").innerText = "● 로컬 모드 (FIREBASE_URL 미설정)";
@@ -459,7 +455,6 @@ async function saveReportsToCloud(newReports) {
   }
 }
 
-// 현재 펼쳐져 있는 상세 카드 ID 목록 저장 및 복원
 function getOpenCardIds() {
   return new Set(
     Array.from(document.querySelectorAll("details.card-details[open]"))
@@ -571,7 +566,6 @@ function renderAll() {
   restoreOpenCards(openIds);
 }
 
-// 시민 제보 제출
 function toggleDirectReport() {
   const wrap = document.getElementById("directReportWrap");
   wrap.style.display = wrap.style.display === "none" ? "block" : "none";
@@ -606,7 +600,6 @@ function selectRegion(r) {
   renderRegionTab();
 }
 
-// 상태별 컬러 커스텀 마커 생성
 function getColoredPinIcon(badgeColor) {
   const colorClass = ["red", "orange", "blue"].includes(badgeColor) ? `pin-${badgeColor}` : "pin-blue";
   return L.divIcon({
@@ -666,7 +659,6 @@ function renderGlobalMap() {
   `).join("");
 }
 
-// 지명/주소 좌표 자동 탐색 (1차: 내부 주요 랜드마크, 2차: OpenStreetMap Nominatim 지오코딩 API)
 function inferRegionFromAddress(displayName) {
   if (/서울/.test(displayName)) return "서울";
   if (/인천|경기/.test(displayName)) return "인천·경기";
@@ -701,14 +693,11 @@ async function resolveLocationCoords(locText) {
         geocoded: true
       };
     }
-  } catch (e) {
-    // 네트워크 오류 시 기본 좌표로 폴백
-  }
+  } catch (e) {}
 
   return { lat: 37.5665, lon: 126.9780, autoReg: "전국 공통", geocoded: false };
 }
 
-// 상황실 인증 및 관리자 패널 렌더링
 function verifyAdminPin() {
   const input = document.getElementById("adminPinInput").value.trim();
   if (input === ADMIN_PIN) {
@@ -744,7 +733,6 @@ function renderAdminPanel() {
   lockScreen.style.display = "none";
   panel.style.display = "block";
 
-  // 1. 시민 제보 대기함 렌더링
   document.getElementById("reportCount").innerText = reportsDB.length;
   const repListEl = document.getElementById("citizenReportsList");
   if (reportsDB.length === 0) {
@@ -766,7 +754,6 @@ function renderAdminPanel() {
     `).join("");
   }
 
-  // 2. 기존 브리핑 관리 목록 렌더링
   const factListEl = document.getElementById("adminFactList");
   factListEl.innerHTML = factDB.map(item => `
     <div class="admin-item">
@@ -938,7 +925,6 @@ async function resetData() {
   alert("초기 기본 데이터로 복원되었습니다.");
 }
 
-// 초기 실행 및 5초마다 다른 기기 변경사항 자동 동기화
 loadFromCloud();
 setInterval(loadFromCloud, 5000);
 </script>
